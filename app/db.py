@@ -23,3 +23,12 @@ class Database:
         lst.append(value)
         self.store[key] = (lst, expiry)
         return len(lst)
+    
+    def lrange(self, key, start, end):
+        if key not in self.store:
+            return []
+        lst, expiry = self.store[key]
+        if expiry is not None and expiry < time.time():
+            del self.store[key]
+            return []
+        return lst[start:end+1]

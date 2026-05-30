@@ -47,6 +47,16 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
                 length = db.rpush(key, value)
             await loop.sock_sendall(client_socket, b":" + str(length).encode() + b"\r\n")
 
+        elif command == b"LRANGE":
+            key = parts[4]
+            start = int(parts[6])
+            end = int(parts[8])
+            values = db.lrange(key, start, end)
+            response = b"*" + str(len(values)).encode() + b"\r\n"
+            for value in values:
+                response += resp_bulk(value)
+            await loop.sock_sendall(client_socket, response)
+
     client_socket.close()
 
 async def main() -> None:
