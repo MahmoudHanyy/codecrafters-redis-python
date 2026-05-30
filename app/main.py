@@ -43,7 +43,7 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
             key = parts[4]
             value = parts[6]
             length = db.rpush(key, value)
-            await loop.sock_sendall(client_socket, resp_bulk(f'(integer){length}'.encode()))
+            await loop.sock_sendall(client_socket, b":" + str(length).encode() + b"\r\n")
 
     client_socket.close()
 
