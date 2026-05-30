@@ -78,7 +78,7 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
             if count is None:
                 value = db.lpop(key)
                 await loop.sock_sendall(client_socket, resp_bulk(value))
-            if isinstance(lst, list) and lst:
+            elif isinstance(lst, list) and lst:
                 results = [db.lpop(key) for _ in range(min(count, len(lst)))]
                 response = b"*" + str(len(results)).encode() + b"\r\n"
                 response += b"".join(resp_bulk(v) for v in results)
