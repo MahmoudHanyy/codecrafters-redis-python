@@ -12,6 +12,6 @@ class Database:
             return default
         value, expiry = self.store[key]
         if expiry is not None and expiry < time.time():
-            del self.store[key]  # clean up expired key
+            del self.store[key]
             return default
         return value
