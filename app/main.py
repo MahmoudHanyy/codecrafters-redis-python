@@ -65,6 +65,12 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
                 response += resp_bulk(value)
             await loop.sock_sendall(client_socket, response)
 
+        elif command == b"LLEN":
+            key = parts[4]
+            lst = db.get(key, [])
+            length = len(lst) if isinstance(lst, list) else 0
+            await loop.sock_sendall(client_socket, b":" + str(length).encode() + b"\r\n")
+
     client_socket.close()
 
 async def main() -> None:
