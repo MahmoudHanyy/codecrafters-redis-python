@@ -6,7 +6,6 @@ class Database:
 
     def set(self, key, value, expire: int = None) -> None:
         self.store[key] = (value, time.time() + expire if expire is not None else None)
-        print(f"SET {key} = {value} (expires in {expire} seconds)" if expire else f"SET {key} = {value}")
 
     def get(self, key, default=None):
         if key not in self.store:
@@ -16,3 +15,11 @@ class Database:
             del self.store[key]
             return default
         return value
+    
+    def rpush(self, key, value):
+        if key not in self.store:
+            self.store[key] = ([], None)
+        lst, expiry = self.store[key]
+        lst.append(value)
+        self.store[key] = (lst, expiry)
+        return len(lst)

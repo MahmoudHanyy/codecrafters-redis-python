@@ -39,6 +39,12 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
             response = resp_bulk(value) if value is not None else b"$-1\r\n"
             await loop.sock_sendall(client_socket, response)
 
+        elif command == b"RPUSH":
+            key = parts[4]
+            value = parts[6]
+            length = db.rpush(key, value)
+            await loop.sock_sendall(client_socket, b"(integer)" + str(length).encode() + b"\r\n")
+
     client_socket.close()
 
 async def main() -> None:
