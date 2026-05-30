@@ -30,7 +30,7 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
             value = parts[6]
             expiry = None
             if len(parts) > 7 and parts[7].upper() in (b"EX", b"PX"): 
-                expiry = int(parts[8]) / 1000 if parts[7].upper() == b"EX" else int(parts[8])
+                expiry = int(parts[8]) / 1000 if parts[7].upper() == b"PX" else int(parts[8])
             db.set(key, value, expire=expiry)
             await loop.sock_sendall(client_socket, b"+OK\r\n")
 
