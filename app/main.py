@@ -41,8 +41,10 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
 
         elif command == b"RPUSH":
             key = parts[4]
-            value = parts[6]
-            length = db.rpush(key, value)
+            values = parts[6::2]
+            length = 0
+            for value in values:
+                length = db.rpush(key, value)
             await loop.sock_sendall(client_socket, b":" + str(length).encode() + b"\r\n")
 
     client_socket.close()
