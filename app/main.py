@@ -30,8 +30,8 @@ async def handle_client(client_socket, loop):
         if command == b"GET":
             key = parts[4]
             value = store.get(key, b"$-1\r\n")
-            await loop.sock_sendall(client_socket, value)
-            
+            await loop.sock_sendall(client_socket, resp_parser(value))
+
     client_socket.close()
 
 async def main():
