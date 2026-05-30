@@ -42,3 +42,13 @@ class Database:
         if end < 0:
             end = len(lst) + end
         return lst[start:end+1]
+    
+    def lpop(self, key):
+        if key not in self.store:
+            return None
+        lst, expiry = self.store[key]
+        if lst:
+            value = lst.pop(0)
+            self.store[key] = (lst, expiry)
+            return value
+        return None
