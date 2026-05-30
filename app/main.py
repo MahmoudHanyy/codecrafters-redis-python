@@ -76,7 +76,7 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
             pops = parts[6] if len(parts) > 6 else 1
             lst = db.get(key, [])
             if isinstance(lst, list) and lst:
-                for _ in range(min(pops, len(lst))):
+                for _ in range(pops+1):
                     value = db.lpop(key)
                     await loop.sock_sendall(client_socket, resp_bulk(value))
             else:
