@@ -1,6 +1,11 @@
 import socket
 import asyncio
 
+store = {}
+
+def resp_parser(msg):
+    return b"$" + str(len(msg)).encode() + b"\r\n" + msg + b"\r\n"
+
 async def handle_client(client_socket, loop):
     while True:
         data = await loop.sock_recv(client_socket, 1024)
@@ -10,10 +15,23 @@ async def handle_client(client_socket, loop):
         command = parts[2].upper()
 
         if command == b"PING":
-             await loop.sock_sendall(client_socket, b"+PONG\r\n")
+            await loop.sock_sendall(client_socket, b"+PONG\r\n")
+
         if command == b"ECHO":
             msg = parts[4]
-            await loop.sock_sendall(client_socket, b"$" + str(len(msg)).encode() + b"\r\n" + msg + b"\r\n")
+            await loop.sock_sendall(client_socket, resp_parser(msg))
+
+        if command == b"SET":
+            key = parts[4]
+            value = parts[6]
+            store[key] = value
+            await loop.sock_sendall(client_socket, b"+OK\r\n")
+
+        if command == b"GET":
+            key = parts[4]
+            value = store.get(key, b"$-1\r\n")
+            await loop.sock_sendall(client_socket, value)
+            
     client_socket.close()
 
 async def main():
