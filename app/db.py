@@ -31,4 +31,6 @@ class Database:
         if expiry is not None and expiry < time.time():
             del self.store[key]
             return []
+        if end < 0:
+            end = len(lst) + end
         return lst[start:end+1]
