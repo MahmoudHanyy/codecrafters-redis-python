@@ -4,9 +4,15 @@ import asyncio
 async def handle_client(client_socket, loop):
     while True:
         data = await loop.sock_recv(client_socket, 1024)
+        parts = data.split(b"\r\n")
+        command = parts[2].upper()
+
+        if command == b"PING":
+             await loop.sock_sendall(client_socket, b"+PONG\r\n")
+        if command == b"ECHO":
+             await loop.sock_sendall(client_socket, b"+" + parts[4] + b"\r\n")
         if not data:
             break
-        await loop.sock_sendall(client_socket, b"+PONG\r\n")
     client_socket.close()
 
 async def main():
