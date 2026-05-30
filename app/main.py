@@ -1,6 +1,13 @@
 import socket
 import asyncio
 
+async def handle_client(client_socket, loop):
+    while True:
+        data = await loop.sock_recv(client_socket, 1024)
+        if not data:
+            break
+        await loop.sock_sendall(client_socket, b"+PONG\r\n")
+    client_socket.close()
 
 async def main():
     print("Logs from your program will appear here!")
@@ -9,14 +16,11 @@ async def main():
     server_socket.setblocking(False) 
     loop = asyncio.get_event_loop()
     
-    client_socket, _ = await loop.sock_accept(server_socket) 
     while True:
-        data = await loop.sock_recv(client_socket, 1024)
-        if not data:
-            break
-        await loop.sock_sendall(client_socket, b"+PONG\r\n")
-    client_socket.close()
-
+        client_socket, _ = await loop.sock_accept(server_socket)
+        asyncio.create_task(handle_client(client_socket, loop)) 
+        
 
 if __name__ == "__main__":
     asyncio.run(main())
+    
