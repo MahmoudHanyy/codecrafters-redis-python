@@ -51,8 +51,8 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
             key = parts[4]
             values = parts[6::2]
             length = 0
-            for value in reversed(values):
-                length = db.rpush(key, value)  # Using rpush to add to the end, but we reverse the input
+            for value in values:
+                length = db.lpush(key, value)
             await loop.sock_sendall(client_socket, b":" + str(length).encode() + b"\r\n")
 
         elif command == b"LRANGE":
