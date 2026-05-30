@@ -1,5 +1,8 @@
 import socket
 import asyncio
+import sys
+import os
+sys.path.insert(0, os.path.dirname(__file__))  # add current file's directory to path
 from db import Database
 
 db = Database()  
