@@ -10,7 +10,7 @@ async def handle_client(client_socket, loop):
         command = parts[2].upper()
 
         if command == b"PING":
-            await loop.sock_sendall(client_socket, b"$4\r\nPONG\r\n")
+             await loop.sock_sendall(client_socket, b"+PONG\r\n")
         if command == b"ECHO":
             msg = parts[4]
             await loop.sock_sendall(client_socket, b"$" + str(len(msg)).encode() + b"\r\n" + msg + b"\r\n")
