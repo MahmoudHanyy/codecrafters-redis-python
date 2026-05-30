@@ -24,6 +24,14 @@ class Database:
         self.store[key] = (lst, expiry)
         return len(lst)
     
+    def lpush(self, key, value):
+        if key not in self.store:
+            self.store[key] = ([], None)
+        lst, expiry = self.store[key]
+        lst.insert(0, value)
+        self.store[key] = (lst, expiry)
+        return len(lst)
+    
     def lrange(self, key, start, end):
         if key not in self.store:
             return []
