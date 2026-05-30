@@ -73,12 +73,13 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
 
         elif command == b"LPOP":
             key = parts[4]
-            pops = parts[6] if len(parts) > 6 else 1
+            count = int(parts[6]) if len(parts) > 6 and parts[6] else 1
             lst = db.get(key, [])
             if isinstance(lst, list) and lst:
-                for _ in range(pops+1):
-                    value = db.lpop(key)
-                    await loop.sock_sendall(client_socket, resp_bulk(value))
+                results = [db.lpop(key) for _ in range(min(count, len(lst)))]
+                response = b"*" + str(len(results)).encode() + b"\r\n"
+                response += b"".join(resp_bulk(v) for v in results)
+                await loop.sock_sendall(client_socket, response)
             else:
                 await loop.sock_sendall(client_socket, b"$-1\r\n")
 
