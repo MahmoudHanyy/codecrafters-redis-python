@@ -94,8 +94,12 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
                     await asyncio.sleep(0.1)
                     if timeout is not None:
                         timeout -= 0.1
-                value = db.lpop(key)
-                response = b"*2\r\n" + resp_bulk(key) + resp_bulk(value)
+                lst = db.get(key, [])
+                if not lst:
+                    await loop.sock_sendall(client_socket, b"$-1\r\n")
+                else:
+                    value = db.lpop(key)
+                    response = b"*2\r\n" + resp_bulk(key) + resp_bulk(value)
                 await loop.sock_sendall(client_socket, response)
             else:
                 await loop.sock_sendall(client_socket, b"$-1\r\n")
