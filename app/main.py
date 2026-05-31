@@ -88,7 +88,7 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
 
         elif command == b"BLPOP":
             key = parts[4]
-            timeout = int(parts[6]) if len(parts) > 6 and parts[6] else None
+            timeout = float(parts[6]) if len(parts) > 6 and parts[6] else None
             while not db.get(key, []) and (timeout is None or timeout > 0):
                 await asyncio.sleep(0.1)
                 if timeout is not None:
