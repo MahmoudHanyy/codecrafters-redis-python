@@ -4,8 +4,10 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(__file__))  # add current file's directory to path
 from db import Database
+from stream import Stream
 
 db = Database()  
+stream = Stream()
 
 def resp_bulk(msg: bytes) -> bytes:
     return b"$" + str(len(msg)).encode() + b"\r\n" + msg + b"\r\n"
@@ -117,7 +119,7 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
             key = parts[4]
             id = parts[6]
             values = parts[8::2]
-            db.xad(key, id, *values)
+            stream.xad(key, id, *values)
             await loop.sock_sendall(client_socket, resp_bulk(id))
 
     client_socket.close()
