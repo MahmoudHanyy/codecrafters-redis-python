@@ -112,6 +112,14 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
             response = b"+" + redis_type.encode() + b"\r\n" if redis_type else b"+none\r\n"
             await loop.sock_sendall(client_socket, response)  
 
+        # Streams and other commands would go here
+        elif command == b"XADD":
+            key = parts[4]
+            id = parts[6]
+            values = parts[8::2]
+            db.xad(key, id, *values)
+            await loop.sock_sendall(client_socket, resp_bulk(id))
+
     client_socket.close()
 
 async def main() -> None:
