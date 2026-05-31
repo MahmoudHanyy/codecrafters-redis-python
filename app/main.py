@@ -104,7 +104,13 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
             else:
                 value = db.lpop(key)
                 response = b"*2\r\n" + resp_bulk(key) + resp_bulk(value)
-                await loop.sock_sendall(client_socket, response)              
+                await loop.sock_sendall(client_socket, response)       
+
+        elif command == b"TYPE":
+            key = parts[4]
+            value = db.get(key)
+            response = type (value).__name__.upper().encode() + b"\r\n" if value is not None else b"none\r\n"
+            await loop.sock_sendall(client_socket, response)     
 
     client_socket.close()
 
