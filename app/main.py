@@ -88,8 +88,11 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
 
         elif command == b"BLPOP":
             key = parts[4]
-            while not db.get(key, []):
+            timeout = int(parts[6]) if len(parts) > 6 and parts[6] else None
+            while not db.get(key, []) and (timeout is None or timeout > 0):
                 await asyncio.sleep(0.1)
+                if timeout is not None:
+                    timeout -= 0.1
             value = db.lpop(key)
             response = b"*2\r\n" + resp_bulk(key) + resp_bulk(value)
             await loop.sock_sendall(client_socket, response)
