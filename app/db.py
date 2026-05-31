@@ -72,3 +72,15 @@ class Database:
         value = lst.pop(0)
         self.store[key] = (lst, self.store[key][1])
         return value
+    
+    def type(self, key):
+        if key not in self.store:
+            return None
+        value, _ = self.store[key]
+        if isinstance(value, list):
+            return "list"
+        if isinstance(value, dict):
+            return "hash"
+        if isinstance(value, set):
+            return "set"
+        return "string"

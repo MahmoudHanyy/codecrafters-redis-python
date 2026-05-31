@@ -108,9 +108,9 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
 
         elif command == b"TYPE":
             key = parts[4]
-            value = db.get(key)
-            response = type (value).__name__.upper().encode() + b"\r\n" if value is not None else b"none\r\n"
-            await loop.sock_sendall(client_socket, response)     
+            redis_type = db.type(key)
+            response = b"+" + redis_type.encode() + b"\r\n" if redis_type else b"+none\r\n"
+            await loop.sock_sendall(client_socket, response)  
 
     client_socket.close()
 
