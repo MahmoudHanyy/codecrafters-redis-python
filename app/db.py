@@ -16,6 +16,14 @@ class Database:
             return default
         return value
     
+    def get_list(self, key):
+        if key not in self.store:
+            return []
+        value, expiry = self.store[key]
+        if not isinstance(value, list):
+            return []
+        return value
+    
     def rpush(self, key, value):
         if key not in self.store:
             self.store[key] = ([], None)
