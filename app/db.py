@@ -1,10 +1,22 @@
-import time 
+import time
+import asyncio
+
 
 class Database:
     def __init__(self):
         self.store = {}
+        self.events = {}
 
-    def set(self, key, value, expire: int = None) -> None:
+    def get_event(self, key):
+        if key not in self.events:
+            self.events[key] = asyncio.Event()
+        return self.events[key]
+
+    def notify(self, key):
+        if key in self.events:
+            self.events[key].set()
+
+    def set(self, key, value, expire=None):
         self.store[key] = (value, time.time() + expire if expire is not None else None)
 
     def get(self, key, default=None):
@@ -15,48 +27,48 @@ class Database:
             del self.store[key]
             return default
         return value
-    
-    def get_list(self, key, default=None):
+
+    def get_list(self, key):
         if key not in self.store:
-            return default if default is not None else []
+            return []
         value, expiry = self.store[key]
         if not isinstance(value, list):
-            return default if default is not None else []
-        return value        
-    
+            return []
+        return value
+
+    def set_list(self, key, lst, expiry=None):
+        self.store[key] = (lst, expiry)
+
     def rpush(self, key, value):
         if key not in self.store:
             self.store[key] = ([], None)
         lst, expiry = self.store[key]
         lst.append(value)
         self.store[key] = (lst, expiry)
+        self.notify(key)
         return len(lst)
-    
+
     def lpush(self, key, value):
         if key not in self.store:
             self.store[key] = ([], None)
         lst, expiry = self.store[key]
         lst.insert(0, value)
         self.store[key] = (lst, expiry)
+        self.notify(key)
         return len(lst)
-    
+
     def lrange(self, key, start, end):
-        if key not in self.store:
-            return []
-        lst, expiry = self.store[key]
-        if expiry is not None and expiry < time.time():
-            del self.store[key]
+        lst = self.get_list(key)
+        if not lst:
             return []
         if end < 0:
             end = len(lst) + end
-        return lst[start:end+1]
-    
+        return lst[start:end + 1]
+
     def lpop(self, key):
-        if key not in self.store:
+        lst = self.get_list(key)
+        if not lst:
             return None
-        lst, expiry = self.store[key]
-        if lst:
-            value = lst.pop(0)
-            self.store[key] = (lst, expiry)
-            return value
-        return None
+        value = lst.pop(0)
+        self.store[key] = (lst, self.store[key][1])
+        return value
