@@ -16,13 +16,13 @@ class Database:
             return default
         return value
     
-    def get_list(self, key):
+    def get_list(self, key, default=None):
         if key not in self.store:
-            return []
+            return default if default is not None else []
         value, expiry = self.store[key]
         if not isinstance(value, list):
-            return []
-        return value
+            return default if default is not None else []
+        return value        
     
     def rpush(self, key, value):
         if key not in self.store:
