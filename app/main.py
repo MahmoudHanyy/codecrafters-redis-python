@@ -95,9 +95,7 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
                 if timeout != 0 and elapsed >= timeout:
                     await loop.sock_sendall(client_socket, b"*-1\r\n")
                     break
-                event = db._get_event(key)
-                event.clear()
-                await event.wait()
+                await asyncio.sleep(0.1)
                 elapsed += 0.1
             else:
                 value = db.lpop(key)
