@@ -102,7 +102,7 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
                     response = b"*2\r\n" + resp_bulk(key) + resp_bulk(value)
                     await loop.sock_sendall(client_socket, response)
             else:
-                await loop.sock_sendall(client_socket, b"$-1\r\n")
+                await loop.sock_sendall(client_socket, b"*-1\r\n")
                         
 
     client_socket.close()
