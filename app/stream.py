@@ -2,7 +2,7 @@
 import asyncio
 
 class Stream:
-    def __init__(self, key):
+    def __init__(self):
         self.stream = {}
         self.events = {}
 
