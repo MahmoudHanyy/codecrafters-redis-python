@@ -1,11 +1,49 @@
-import time
 import asyncio
+import time
+
+
+class Stream:
+    type = "stream"
+
+    def __init__(self):
+        self.entries = []
+
+    def xadd(self, id, *values):
+        fields = {}
+        for i in range(0, len(values), 2):
+            fields[values[i]] = values[i + 1]
+        self.entries.append((id, fields))
+        return id
+
+class RedisList:
+    type = "list"
+
+    def __init__(self):
+        self.data = []
 
 
 class Database:
     def __init__(self):
-        self.store = {}
+        self.store = {}   # key -> {"type": ..., "value": ..., "expiry": ...}
         self.events = {}
+
+    # --- internal helpers ---
+
+    def _is_expired(self, key):
+        expiry = self.store[key]["expiry"]
+        if expiry is not None and expiry < time.time():
+            del self.store[key]
+            return True
+        return False
+
+    def _get_entry(self, key):
+        if key not in self.store:
+            return None
+        if self._is_expired(key):
+            return None
+        return self.store[key]
+
+    # --- events ---
 
     def get_event(self, key):
         if key not in self.events:
@@ -16,71 +54,85 @@ class Database:
         if key in self.events:
             self.events[key].set()
 
+    # --- string ---
+
     def set(self, key, value, expire=None):
-        self.store[key] = (value, time.time() + expire if expire is not None else None)
+        self.store[key] = {
+            "type": "string",
+            "value": value,
+            "expiry": time.time() + expire if expire is not None else None,
+        }
 
     def get(self, key, default=None):
-        if key not in self.store:
+        entry = self._get_entry(key)
+        if entry is None or entry["type"] != "string":
             return default
-        value, expiry = self.store[key]
-        if expiry is not None and expiry < time.time():
-            del self.store[key]
-            return default
-        return value
+        return entry["value"]
 
-    def get_list(self, key):
-        if key not in self.store:
-            return []
-        value, expiry = self.store[key]
-        if not isinstance(value, list):
-            return []
-        return value
+    # --- list ---
 
-    def set_list(self, key, lst, expiry=None):
-        self.store[key] = (lst, expiry)
+    def _get_or_create_list(self, key):
+        entry = self._get_entry(key)
+        if entry is None:
+            self.store[key] = {"type": "list", "value": [], "expiry": None}
+        elif entry["type"] != "list":
+            raise TypeError(f"Key '{key}' holds a {entry['type']}, not a list")
+        return self.store[key]["value"]
 
     def rpush(self, key, value):
-        if key not in self.store:
-            self.store[key] = ([], None)
-        lst, expiry = self.store[key]
+        lst = self._get_or_create_list(key)
         lst.append(value)
-        self.store[key] = (lst, expiry)
         self.notify(key)
         return len(lst)
 
     def lpush(self, key, value):
-        if key not in self.store:
-            self.store[key] = ([], None)
-        lst, expiry = self.store[key]
+        lst = self._get_or_create_list(key)
         lst.insert(0, value)
-        self.store[key] = (lst, expiry)
         self.notify(key)
         return len(lst)
 
     def lrange(self, key, start, end):
-        lst = self.get_list(key)
-        if not lst:
+        entry = self._get_entry(key)
+        if entry is None or entry["type"] != "list":
             return []
+        lst = entry["value"]
         if end < 0:
             end = len(lst) + end
         return lst[start:end + 1]
 
     def lpop(self, key):
-        lst = self.get_list(key)
-        if not lst:
+        entry = self._get_entry(key)
+        if entry is None or entry["type"] != "list":
             return None
-        value = lst.pop(0)
-        self.store[key] = (lst, self.store[key][1])
-        return value
-    
+        lst = entry["value"]
+        return lst.pop(0) if lst else None
+
+    # --- stream ---
+
+    def _get_or_create_stream(self, key):
+        entry = self._get_entry(key)
+        if entry is None:
+            stream = Stream()
+            self.store[key] = {"type": "stream", "value": stream, "expiry": None}
+        elif entry["type"] != "stream":
+            raise TypeError(f"Key '{key}' holds a {entry['type']}, not a stream")
+        return self.store[key]["value"]
+
+    def xadd(self, key, id, *values):
+        stream = self._get_or_create_stream(key)
+        self.notify(key)
+        return stream.xadd(id, *values)
+
+    def xrange(self, key, start="-", end="+"):
+        entry = self._get_entry(key)
+        if entry is None or entry["type"] != "stream":
+            return []
+        return entry["value"].xrange(start, end)
+
+    # --- type ---
+
     def type(self, key):
-        if key not in self.store:
-            return None
-        value, _ = self.store[key]
-        if isinstance(value, list):
-            return "list"
-        if isinstance(value, dict):
-            return "hash"
-        if isinstance(value, set):
-            return "set"
-        return "string"
+        entry = self._get_entry(key)
+        if entry is None:
+            return "none"
+        return entry["type"]
