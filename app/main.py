@@ -114,7 +114,7 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
             if redis_type is None:
                 redis_type = stream.stream.get(key, None)
                 if redis_type is not None:
-                    redis_type = b"stream"
+                    redis_type = "stream"
             response = b"+" + redis_type.encode() + b"\r\n" if redis_type else b"+none\r\n"
             await loop.sock_sendall(client_socket, response)  
 
