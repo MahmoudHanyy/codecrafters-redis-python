@@ -20,7 +20,7 @@ class Stream:
     def xadd(self, key, id, *values):
         timestamp, seq = id.split(b'-')
         if seq == b'*':
-            seq = b'0'
+            seq = b'1'
             if key in self.stream and 'entries' in self.stream[key] and self.stream[key]['entries']:
                 last_id = self.stream[key]['entries'][-1]['id']
                 last_timestamp, last_seq = last_id.split(b'-')
