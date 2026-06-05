@@ -2,10 +2,12 @@ import socket
 import asyncio
 import sys
 import os
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(__file__))  # add current file's directory to path
 from db import Database
+from stream import Stream
 
-db = Database()
+db = Database()  
+stream = Stream()
 
 def resp_bulk(msg: bytes) -> bytes:
     return b"$" + str(len(msg)).encode() + b"\r\n" + msg + b"\r\n"
@@ -22,7 +24,7 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
         if command == b"PING":
             await loop.sock_sendall(client_socket, b"+PONG\r\n")
 
-        elif command == b"ECHO":
+        elif command == b"ECHO":  
             await loop.sock_sendall(client_socket, resp_bulk(parts[4]))
 
         elif command == b"SET":
@@ -30,7 +32,7 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
             value = parts[6]
             expiry = None
             if len(parts) > 8 and parts[8].upper() in (b"EX", b"PX"):
-                expiry = int(parts[10]) / 1000 if parts[8].upper() == b"PX" else int(parts[10])
+                expiry = int(parts[10]) / 1000 if parts[8].upper() == b"PX" else int(parts[10]) 
             db.set(key, value, expire=expiry)
             await loop.sock_sendall(client_socket, b"+OK\r\n")
 
@@ -67,22 +69,18 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
 
         elif command == b"LLEN":
             key = parts[4]
-            entry = db._get_entry(key)
-            if entry is None or entry["type"] != "list":
-                await loop.sock_sendall(client_socket, b":0\r\n")
-            else:
-                await loop.sock_sendall(client_socket, b":" + str(len(entry["value"])).encode() + b"\r\n")
+            lst = db.get(key, [])
+            length = len(lst) if isinstance(lst, list) else 0
+            await loop.sock_sendall(client_socket, b":" + str(length).encode() + b"\r\n")
 
         elif command == b"LPOP":
             key = parts[4]
-            entry = db._get_entry(key)
             count = int(parts[6]) if len(parts) > 6 and parts[6] else None
+            lst = db.get(key, [])
             if count is None:
                 value = db.lpop(key)
-                response = resp_bulk(value) if value is not None else b"$-1\r\n"
-                await loop.sock_sendall(client_socket, response)
-            elif entry and entry["type"] == "list" and entry["value"]:
-                lst = entry["value"]
+                await loop.sock_sendall(client_socket, resp_bulk(value))
+            elif isinstance(lst, list) and lst:
                 results = [db.lpop(key) for _ in range(min(count, len(lst)))]
                 response = b"*" + str(len(results)).encode() + b"\r\n"
                 response += b"".join(resp_bulk(v) for v in results)
@@ -94,8 +92,7 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
             key = parts[4]
             timeout = float(parts[6]) if len(parts) > 6 and parts[6] else 0
 
-            entry = db._get_entry(key)
-            while entry is None or entry["type"] != "list" or not entry["value"]:
+            while not db.get_list(key):
                 event = db.get_event(key)
                 event.clear()
                 if timeout != 0:
@@ -106,23 +103,23 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
                         break
                 else:
                     await event.wait()
-                entry = db._get_entry(key)
             else:
                 value = db.lpop(key)
                 response = b"*2\r\n" + resp_bulk(key) + resp_bulk(value)
-                await loop.sock_sendall(client_socket, response)
+                await loop.sock_sendall(client_socket, response)       
 
         elif command == b"TYPE":
             key = parts[4]
             redis_type = db.type(key)
-            await loop.sock_sendall(client_socket, b"+" + redis_type.encode() + b"\r\n")
+            response = b"+" + redis_type.encode() + b"\r\n" if redis_type else b"+none\r\n"
+            await loop.sock_sendall(client_socket, response)  
 
+        # Streams and other commands would go here
         elif command == b"XADD":
             key = parts[4]
             id = parts[6]
-            # parts[8], parts[10], parts[12]... are field, value, field, value...
-            fields_and_values = parts[8:]
-            db.xadd(key, id, *fields_and_values)
+            values = parts[8::2]
+            stream.xadd(key, id, *values)
             await loop.sock_sendall(client_socket, resp_bulk(id))
 
     client_socket.close()

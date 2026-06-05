@@ -6,7 +6,7 @@ class Stream:
         self.stream = {}
         self.events = {}
 
-    def xad(self, key, id, *values):
+    def xadd(self, key, id, *values):
         if key not in self.stream:
             self.stream[key] = {'id': id}
         for i in range(0, len(values), 2):
