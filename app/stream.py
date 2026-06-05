@@ -14,7 +14,7 @@ class Stream:
             raise ValueError(b"-ERR The ID specified in XADD must be greater than 0-0\r\n")
         for entry in self.stream[key].get('entries', []):
             current_timestamp, current_seq = entry['id'].split(b'-')
-            if timestamp <= current_timestamp and seq <= current_seq:
+            if timestamp <= current_timestamp or (timestamp <= current_timestamp and seq <= current_seq):
                 raise ValueError(b"-ERR The ID specified in XADD is equal or smaller than the target stream top item\r\n")
 
     def xadd(self, key, id, *values):
