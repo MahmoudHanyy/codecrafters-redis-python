@@ -18,6 +18,18 @@ class Stream:
                 raise ValueError(b"-ERR The ID specified in XADD is equal or smaller than the target stream top item\r\n")
 
     def xadd(self, key, id, *values):
+        timestamp, seq = id.split(b'-')
+        if seq == b'*':
+            seq = b'0'
+            if key in self.stream and 'entries' in self.stream[key] and self.stream[key]['entries']:
+                last_id = self.stream[key]['entries'][-1]['id']
+                last_timestamp, last_seq = last_id.split(b'-')
+                # if timestamp == b'*':
+                #     timestamp = str(int(last_timestamp) + 1).encode()
+                # else:
+                #     timestamp = max(timestamp, last_timestamp)
+                seq = str(int(last_seq) + 1).encode()
+        id = timestamp + b'-' + seq
         self.validate_id(key, id)
         if key not in self.stream:
             self.stream[key] = {'entries': [{'id': id, 'values': values}]}
