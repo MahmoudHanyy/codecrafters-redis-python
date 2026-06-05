@@ -124,7 +124,7 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
             id = parts[6]
             values = parts[8::2]
             try:
-                stream.xadd(key, id, *values)
+                id = stream.xadd(key, id, *values)
                 await loop.sock_sendall(client_socket, resp_bulk(id))
             except ValueError as e:
                 await loop.sock_sendall(client_socket, e.args[0])

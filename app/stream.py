@@ -36,3 +36,5 @@ class Stream:
         else:
             for i in range(0, len(values), 2):
                 self.stream[key]['entries'].append({'id': id, 'values': values[i:i+2]})
+
+        return id
