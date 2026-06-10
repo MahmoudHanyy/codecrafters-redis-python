@@ -1,6 +1,6 @@
 import time
 import asyncio
-
+from stream import Stream
 
 class Database:
     def __init__(self):
@@ -73,10 +73,26 @@ class Database:
         self.store[key] = (lst, self.store[key][1])
         return value
     
-    def type(self, key):
-        if key not in self.store:
+    def get_stream(self, key, create=False):
+        """Return the Stream stored at key, creating one if asked.
+        Returns None if the key holds a non-stream value (WRONGTYPE)."""
+        existing = self.get(key)
+        if isinstance(existing, Stream):
+            return existing
+        if existing is not None:
             return None
-        value, _ = self.store[key]
+        if create:
+            s = Stream()
+            self.store[key] = (s, None)
+            return s
+        return None
+
+    def type(self, key):
+        value = self.get(key)
+        if value is None:
+            return "none"
+        if isinstance(value, Stream):
+            return "stream"
         if isinstance(value, list):
             return "list"
         if isinstance(value, dict):

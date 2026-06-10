@@ -4,10 +4,8 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(__file__))  # add current file's directory to path
 from db import Database
-from stream import Stream
 
-db = Database()  
-stream = Stream()
+db = Database()
 
 def resp_bulk(msg: bytes) -> bytes:
     return b"$" + str(len(msg)).encode() + b"\r\n" + msg + b"\r\n"
@@ -111,23 +109,37 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
         elif command == b"TYPE":
             key = parts[4]
             redis_type = db.type(key)
-            if redis_type is None:
-                redis_type = stream.stream.get(key, None)
-                if redis_type is not None:
-                    redis_type = "stream"
-            response = b"+" + redis_type.encode() + b"\r\n" if redis_type else b"+none\r\n"
-            await loop.sock_sendall(client_socket, response)  
+            response = b"+" + redis_type.encode() + b"\r\n"
+            await loop.sock_sendall(client_socket, response)
 
         # Streams and other commands would go here
         elif command == b"XADD":
             key = parts[4]
             id = parts[6]
-            values = parts[8::2]
+            fields = parts[8::2]
             try:
-                id = stream.xadd(key, id, *values)
-                await loop.sock_sendall(client_socket, resp_bulk(id))
+                s = db.get_stream(key, create=True)
+                new_id = s.add(id, fields)
+                await loop.sock_sendall(client_socket, resp_bulk(new_id))
             except ValueError as e:
                 await loop.sock_sendall(client_socket, e.args[0])
+
+        elif command == b"XRANGE":
+            key = parts[4]
+            start = parts[6]
+            end = parts[8]
+            s = db.get_stream(key)
+            if s is None:
+                await loop.sock_sendall(client_socket, b"*0\r\n")
+            else:
+                entries = [e for e in s.entries if start <= b'%d-%d' % e['id'] <= end]
+                response = b"*" + str(len(entries)).encode() + b"\r\n"
+                for entry in entries:
+                    response += resp_bulk(b'%d-%d' % entry['id'])
+                    response += b"*" + str(len(entry['fields'])).encode() + b"\r\n"
+                    for field in entry['fields']:
+                        response += resp_bulk(field)
+                await loop.sock_sendall(client_socket, response)
 
     client_socket.close()
 
