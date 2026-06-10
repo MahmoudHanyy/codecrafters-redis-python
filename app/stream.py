@@ -1,5 +1,6 @@
 
 import asyncio
+import time
 
 class Stream:
     def __init__(self):
@@ -18,7 +19,12 @@ class Stream:
                 raise ValueError(b"-ERR The ID specified in XADD is equal or smaller than the target stream top item\r\n")
 
     def xadd(self, key, id, *values):
-        timestamp, seq = id.split(b'-')
+        print(f"Adding entry to stream '{key}' with ID '{id}' and values {values}")  # Debug statement
+        if id == b'*':
+            timestamp = str(int(time.time() * 1000)).encode()
+            seq = b'*'
+        else:
+            timestamp, seq = id.split(b'-')
         if seq == b'*':
             seq = b'1' if timestamp == b'0' else b'0'
             if key in self.stream and self.stream[key].get('entries'):
