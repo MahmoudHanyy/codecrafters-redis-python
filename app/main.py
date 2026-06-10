@@ -132,9 +132,18 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
             if s is None:
                 await loop.sock_sendall(client_socket, b"*0\r\n")
             else:
-                entries = [e for e in s.entries if start <= b'%d-%d' % e['id'] <= end]
+                def parse_id(b, default_seq):
+                    if b'-' in b:
+                        ms, seq = b.split(b'-')
+                        return (int(ms), int(seq))
+                    return (int(b), default_seq)
+
+                lo = parse_id(start, 0)
+                hi = parse_id(end, (1 << 63) - 1)
+                entries = [e for e in s.entries if lo <= e['id'] <= hi]
                 response = b"*" + str(len(entries)).encode() + b"\r\n"
                 for entry in entries:
+                    response += b"*2\r\n"
                     response += resp_bulk(b'%d-%d' % entry['id'])
                     response += b"*" + str(len(entry['fields'])).encode() + b"\r\n"
                     for field in entry['fields']:
