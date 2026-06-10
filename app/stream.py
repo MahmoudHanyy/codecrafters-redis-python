@@ -21,14 +21,11 @@ class Stream:
         timestamp, seq = id.split(b'-')
         if seq == b'*':
             seq = b'1' if timestamp == b'0' else b'0'
-            if key in self.stream and 'entries' in self.stream[key] and self.stream[key]['entries']:
+            if key in self.stream and self.stream[key].get('entries'):
                 last_id = self.stream[key]['entries'][-1]['id']
                 last_timestamp, last_seq = last_id.split(b'-')
-                # if timestamp == b'*':
-                #     timestamp = str(int(last_timestamp) + 1).encode()
-                # else:
-                #     timestamp = max(timestamp, last_timestamp)
-                seq = str(int(last_seq) + 1).encode()
+                if timestamp == last_timestamp:
+                    seq = str(int(last_seq) + 1).encode()
         id = timestamp + b'-' + seq
         self.validate_id(key, id)
         if key not in self.stream:
