@@ -10,6 +10,18 @@ db = Database()
 def resp_bulk(msg: bytes) -> bytes:
     return b"$" + str(len(msg)).encode() + b"\r\n" + msg + b"\r\n"
 
+def parse_id(b: bytes, default_seq: int) -> tuple:
+    """Parse a stream ID argument into a (ms, seq) tuple for comparison.
+    `-`/`+` are the min/max sentinels; a bare ms uses default_seq."""
+    if b == b'-':
+        return (0, 0)
+    if b == b'+':
+        return ((1 << 64) - 1, (1 << 64) - 1)
+    if b'-' in b:
+        ms, seq = b.split(b'-')
+        return (int(ms), int(seq))
+    return (int(b), default_seq)
+
 async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEventLoop) -> None:
     while True:
         data = await loop.sock_recv(client_socket, 1024)
@@ -132,16 +144,6 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
             if s is None:
                 await loop.sock_sendall(client_socket, b"*0\r\n")
             else:
-                def parse_id(b, default_seq):
-                    if b == b'-':
-                        return (0, 0)
-                    if b == b'+':
-                        return ((1 << 64) - 1, (1 << 64) - 1)
-                    if b'-' in b:
-                        ms, seq = b.split(b'-')
-                        return (int(ms), int(seq))
-                    return (int(b), default_seq)
-
                 lo = parse_id(start, 0)
                 hi = parse_id(end, (1 << 63) - 1)
                 entries = [e for e in s.entries if lo <= e['id'] <= hi]
@@ -153,6 +155,35 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
                     for field in entry['fields']:
                         response += resp_bulk(field)
                 await loop.sock_sendall(client_socket, response)
+
+        elif command == b"XREAD":
+            streams_index = parts.index(b"STREAMS")
+            stream_keys = parts[streams_index + 1:streams_index + 1 + (len(parts) - streams_index - 1) // 2]
+            stream_ids = parts[streams_index + 1 + (len(parts) - streams_index - 1) // 2:]
+
+            results = []
+            for key, id in zip(stream_keys, stream_ids):
+                s = db.get_stream(key)
+                if s is None:
+                    continue
+                last_id = parse_id(id, (1 << 63) - 1)
+                entries = [e for e in s.entries if e['id'] > last_id]
+                if entries:
+                    results.append((key, entries))
+
+            response = b"*" + str(len(results)).encode() + b"\r\n"
+            for key, entries in results:
+                response += b"*2\r\n"
+                response += resp_bulk(key)
+                response += b"*" + str(len(entries)).encode() + b"\r\n"
+                for entry in entries:
+                    response += b"*2\r\n"
+                    response += resp_bulk(b'%d-%d' % entry['id'])
+                    response += b"*" + str(len(entry['fields'])).encode() + b"\r\n"
+                    for field in entry['fields']:
+                        response += resp_bulk(field)
+
+            await loop.sock_sendall(client_socket, response)
 
     client_socket.close()
 
