@@ -165,7 +165,7 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
                 block_ms = int(parts[upper.index(b"BLOCK") + 2])  # +2 skips the $N length prefix
 
             streams_index = upper.index(b"STREAMS")
-            args = parts[streams_index + 1:-1:2]   # real values only, drop $N prefixes and trailing ''
+            args = parts[streams_index + 2:-1:2]   # +2 skips STREAMS' own $N; step 2 skips later $N prefixes
             half = len(args) // 2
             stream_keys, stream_ids = args[:half], args[half:]
 
