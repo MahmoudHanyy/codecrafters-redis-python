@@ -157,33 +157,72 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
                 await loop.sock_sendall(client_socket, response)
 
         elif command == b"XREAD":
-            streams_index = [p.upper() for p in parts].index(b"STREAMS")
-            stream_keys = parts[streams_index + 1:streams_index + 1 + (len(parts) - streams_index - 1) // 2]
-            stream_ids = parts[streams_index + 1 + (len(parts) - streams_index - 1) // 2:]
+            upper = [p.upper() for p in parts]
 
-            results = []
+            # BLOCK <ms> is an option, not a separate command. 0 = block forever.
+            block_ms = None
+            if b"BLOCK" in upper:
+                block_ms = int(parts[upper.index(b"BLOCK") + 1])
+
+            streams_index = upper.index(b"STREAMS")
+            args = parts[streams_index + 1:-1:2]   # real values only, drop $N prefixes and trailing ''
+            half = len(args) // 2
+            stream_keys, stream_ids = args[:half], args[half:]
+
+            # Resolve each requested id once, up front. `$` means "only entries
+            # added after this call blocks" -> snapshot the stream's current last id.
+            last_ids = []
             for key, id in zip(stream_keys, stream_ids):
-                s = db.get_stream(key)
-                if s is None:
-                    continue
-                last_id = parse_id(id, (1 << 63) - 1)
-                entries = [e for e in s.entries if e['id'] > last_id]
-                if entries:
-                    results.append((key, entries))
+                if id == b'$':
+                    s = db.get_stream(key)
+                    last_ids.append(s.last_id if s is not None else (0, 0))
+                else:
+                    last_ids.append(parse_id(id, (1 << 63) - 1))
 
-            response = b"*" + str(len(results)).encode() + b"\r\n"
-            for key, entries in results:
-                response += b"*2\r\n"
-                response += resp_bulk(key)
-                response += b"*" + str(len(entries)).encode() + b"\r\n"
-                for entry in entries:
+            def read_new():
+                out = []
+                for key, last_id in zip(stream_keys, last_ids):
+                    s = db.get_stream(key)
+                    if s is None:
+                        continue
+                    entries = [e for e in s.entries if e['id'] > last_id]
+                    if entries:
+                        out.append((key, entries))
+                return out
+
+            results = read_new()
+
+            # Blocking: wait for new data until something arrives or we time out.
+            if block_ms is not None and not results:
+                timeout = None if block_ms == 0 else block_ms / 1000
+                while not results:
+                    waiters = [asyncio.ensure_future(db.get_event(k).wait()) for k in stream_keys]
+                    try:
+                        done, _ = await asyncio.wait(
+                            waiters, timeout=timeout, return_when=asyncio.FIRST_COMPLETED,
+                        )
+                    finally:
+                        for w in waiters:
+                            w.cancel()
+                    results = read_new()
+                    if not done and not results:           # timed out, nothing new
+                        await loop.sock_sendall(client_socket, b"$-1\r\n")
+                        break
+
+            # Send results unless we already replied with the block timeout nil.
+            if results or block_ms is None:
+                response = b"*" + str(len(results)).encode() + b"\r\n"
+                for key, entries in results:
                     response += b"*2\r\n"
-                    response += resp_bulk(b'%d-%d' % entry['id'])
-                    response += b"*" + str(len(entry['fields'])).encode() + b"\r\n"
-                    for field in entry['fields']:
-                        response += resp_bulk(field)
-
-            await loop.sock_sendall(client_socket, response)
+                    response += resp_bulk(key)
+                    response += b"*" + str(len(entries)).encode() + b"\r\n"
+                    for entry in entries:
+                        response += b"*2\r\n"
+                        response += resp_bulk(b'%d-%d' % entry['id'])
+                        response += b"*" + str(len(entry['fields'])).encode() + b"\r\n"
+                        for field in entry['fields']:
+                            response += resp_bulk(field)
+                await loop.sock_sendall(client_socket, response)
 
     client_socket.close()
 
