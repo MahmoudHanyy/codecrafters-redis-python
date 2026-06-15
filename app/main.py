@@ -157,7 +157,7 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
                 await loop.sock_sendall(client_socket, response)
 
         elif command == b"XREAD":
-            streams_index = parts.index(b"STREAMS")
+            streams_index = [p.upper() for p in parts].index(b"STREAMS")
             stream_keys = parts[streams_index + 1:streams_index + 1 + (len(parts) - streams_index - 1) // 2]
             stream_ids = parts[streams_index + 1 + (len(parts) - streams_index - 1) // 2:]
 
