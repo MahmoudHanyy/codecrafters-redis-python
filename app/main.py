@@ -162,7 +162,7 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
             # BLOCK <ms> is an option, not a separate command. 0 = block forever.
             block_ms = None
             if b"BLOCK" in upper:
-                block_ms = int(parts[upper.index(b"BLOCK") + 1])
+                block_ms = int(parts[upper.index(b"BLOCK") + 2])  # +2 skips the $N length prefix
 
             streams_index = upper.index(b"STREAMS")
             args = parts[streams_index + 1:-1:2]   # real values only, drop $N prefixes and trailing ''
