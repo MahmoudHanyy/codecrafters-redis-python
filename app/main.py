@@ -133,6 +133,10 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
                 await loop.sock_sendall(client_socket, b"*0\r\n")
             else:
                 def parse_id(b, default_seq):
+                    if b == b'-':
+                        return (0, 0)
+                    if b == b'+':
+                        return ((1 << 64) - 1, (1 << 64) - 1)
                     if b'-' in b:
                         ms, seq = b.split(b'-')
                         return (int(ms), int(seq))
