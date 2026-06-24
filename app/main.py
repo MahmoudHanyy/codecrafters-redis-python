@@ -206,7 +206,7 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
                             w.cancel()
                     results = read_new()
                     if not done and not results:           # timed out, nothing new
-                        await loop.sock_sendall(client_socket, b"$-1\r\n")
+                        await loop.sock_sendall(client_socket, b"*-1\r\n")
                         break
 
             # Send results unless we already replied with the block timeout nil.
