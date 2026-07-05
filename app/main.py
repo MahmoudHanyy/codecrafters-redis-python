@@ -132,6 +132,7 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
             try:
                 s = db.get_stream(key, create=True)
                 new_id = s.add(id, fields)
+                db.notify(key)   # wake any XREAD BLOCK waiting on this stream
                 await loop.sock_sendall(client_socket, resp_bulk(new_id))
             except ValueError as e:
                 await loop.sock_sendall(client_socket, e.args[0])
@@ -194,20 +195,29 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
 
             # Blocking: wait for new data until something arrives or we time out.
             if block_ms is not None and not results:
-                timeout = None if block_ms == 0 else block_ms / 1000
+                # deadline is None for BLOCK 0 (wait forever)
+                deadline = None if block_ms == 0 else loop.time() + block_ms / 1000
                 while not results:
+                    # Clear before re-checking so an XADD between read and wait
+                    # isn't lost, and a stale set() from a prior call can't spin us.
+                    for k in stream_keys:
+                        db.get_event(k).clear()
+                    results = read_new()
+                    if results:
+                        break
+                    remaining = None if deadline is None else deadline - loop.time()
+                    if remaining is not None and remaining <= 0:
+                        await loop.sock_sendall(client_socket, b"*-1\r\n")
+                        break
                     waiters = [asyncio.ensure_future(db.get_event(k).wait()) for k in stream_keys]
                     try:
-                        done, _ = await asyncio.wait(
-                            waiters, timeout=timeout, return_when=asyncio.FIRST_COMPLETED,
+                        await asyncio.wait(
+                            waiters, timeout=remaining, return_when=asyncio.FIRST_COMPLETED,
                         )
                     finally:
                         for w in waiters:
                             w.cancel()
                     results = read_new()
-                    if not done and not results:           # timed out, nothing new
-                        await loop.sock_sendall(client_socket, b"*-1\r\n")
-                        break
 
             # Send results unless we already replied with the block timeout nil.
             if results or block_ms is None:
