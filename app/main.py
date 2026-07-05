@@ -234,6 +234,16 @@ async def handle_client(client_socket: socket.socket, loop: asyncio.AbstractEven
                             response += resp_bulk(field)
                 await loop.sock_sendall(client_socket, response)
 
+        elif command == b"INCR":
+            key = parts[4]
+            value = db.get(key, b'0')
+            try:
+                new_value = str(int(value) + 1).encode()
+                db.set(key, new_value)
+                await loop.sock_sendall(client_socket, b":" + new_value + b"\r\n")
+            except ValueError:
+                await loop.sock_sendall(client_socket, b"-ERR value is not an integer or out of range\r\n")
+
     client_socket.close()
 
 async def main() -> None:
